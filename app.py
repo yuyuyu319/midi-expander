@@ -6,28 +6,34 @@ from flask import Flask, request, send_file, make_response
 
 app = Flask(__name__)
 
+# --- デザイン & コンテンツ ---
 HTML_PAGE = """
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDI Expander | ダイナミクス強調ツール</title>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4758959657594096" crossorigin="anonymous"></script>
+    <title>MIDI Expander | ダイナミクス強調・下位音減衰ツール</title>
+    <meta name="description" content="MIDIのスレッショルド以下のベロシティをレシオに基づいてさらに減衰。リズムのキレを良くし、音楽的なメリハリを強調するMIDIエキスパンダー。">
+    
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4758959657594096"
+     crossorigin="anonymous"></script>
+
     <style>
         :root { --accent: #ff5252; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
         body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; text-align: center; padding: 50px 20px; margin:0; line-height: 1.6; }
-        .card { background: var(--card); padding: 40px; border-radius: 24px; max-width: 600px; margin: auto; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); }
+        .card { background: var(--card); padding: 40px; border-radius: 24px; max-width: 650px; margin: auto; border: 1px solid #334155; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); }
         h1 { color: var(--accent); font-size: 2.5rem; margin-bottom: 10px; font-weight: 800; }
         .subtitle { color: #94a3b8; margin-bottom: 30px; font-size: 1.1rem; }
         .form-group { margin: 20px 0; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
         label { display: block; font-size: 0.9rem; color: #94a3b8; margin-bottom: 8px; font-weight: 600; }
-        input[type="number"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+        input[type="number"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; font-size: 1rem; box-sizing: border-box; transition: 0.3s; }
+        input[type="number"]:focus { border-color: var(--accent); outline: none; }
         button { background: var(--accent); color: white; border: none; padding: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1rem; margin-top: 20px; transition: 0.2s; }
         button:hover { transform: translateY(-2px); opacity: 0.9; }
         
         .link-box { margin-top: 25px; padding-top: 20px; border-top: 1px solid #334155; font-size: 0.8rem; color: #94a3b8; }
-        .link-box a { text-decoration: none; font-weight: bold; margin: 0 3px; }
+        .link-box a { text-decoration: none; font-weight: bold; margin: 0 4px; display: inline-block; }
         .link-box a.humanizer { color: #00e676; }
         .link-box a.normalizer { color: #00b0ff; }
         .link-box a.limiter { color: #ff9100; }
@@ -35,6 +41,9 @@ HTML_PAGE = """
 
         .content-section { max-width: 700px; margin: 60px auto; text-align: left; background: rgba(30, 41, 59, 0.5); padding: 40px; border-radius: 20px; border: 1px solid #1e293b; }
         .content-section h2 { color: var(--accent); border-bottom: 2px solid #334155; padding-bottom: 10px; margin-top: 40px; }
+        
+        .policy-section { max-width: 600px; margin: 80px auto 0; text-align: left; padding: 30px; border-top: 1px solid #334155; color: #94a3b8; font-size: 0.85rem; }
+        .policy-section h2 { color: #f8fafc; font-size: 1.1rem; border-left: 4px solid var(--accent); padding-left: 10px; margin-bottom: 15px; }
         .footer-copy { margin-top: 40px; font-size: 0.75rem; color: #475569; padding-bottom: 40px; }
     </style>
 </head>
@@ -64,29 +73,50 @@ HTML_PAGE = """
             <a href="https://midi-compressor.onrender.com/" class="compressor">Compressor</a>
         </div>
     </div>
+
     <div class="content-section">
-        <h2>MIDIエキスパンダーの活用</h2>
-        <p>スレッショルド値を下回る微細な音をさらに減衰させることで、アクセントの付いた音とそうでない音の差を広げます。リズムのキレを良くしたり、不要なゴーストノートを目立たなくさせるのに有効です。</p>
+        <h2>MIDIエキスパンダーの活用法</h2>
+        <p>エキスパンダーはコンプレッサーの逆の働きをします。スレッショルド値を下回る微細な音（ゴーストノート等）をレシオに基づいてさらに減衰させることで、アクセントの付いた音を際立たせ、トラックに「キレ」と「メリハリ」を与えます。</p>
+        <h3>主な用途</h3>
+        <p>・リズムトラックの余計な連打音を整理し、ノリをタイトにする<br>・強弱の差（ダイナミクス）を広げ、ドラマチックな演奏にする<br>・ベロシティが低すぎる音を音楽的にカットする</p>
     </div>
+
+    <div class="policy-section">
+        <h2>プライバシーポリシー</h2>
+        <p><strong>データ処理：</strong>アップロードされたMIDIファイルはサーバーに保存されず、メモリ内で即座に処理・返送されます。楽曲の著作権やプライバシーは完全に守られます。</p>
+        <p><strong>広告配信：</strong>当サイトではGoogle AdSense等の第三者配信事業者がCookieを利用して広告を配信する場合があります。</p>
+    </div>
+
     <div class="footer-copy">&copy; 2026 MIDI Expander. All rights reserved.</div>
 </body>
 </html>
 """
 
+# --- MIDI処理ロジック ---
 def process_logic(midi_file_stream, threshold, ratio):
-    midi_file_stream.seek(0); input_data = io.BytesIO(midi_file_stream.read())
-    try: mid = mido.MidiFile(file=input_data)
+    midi_file_stream.seek(0)
+    input_data = io.BytesIO(midi_file_stream.read())
+    try:
+        mid = mido.MidiFile(file=input_data)
     except: return None
     for track in mid.tracks:
         for msg in track:
             if msg.type == 'note_on' and msg.velocity > 0:
                 if msg.velocity < threshold:
+                    # 拡張計算: スレッショルド - (不足分 * レシオ)
                     msg.velocity = int(threshold - (threshold - msg.velocity) * ratio)
                 msg.velocity = max(1, min(127, msg.velocity))
-    output = io.BytesIO(); mid.save(file=output); output.seek(0); return output
+    output = io.BytesIO()
+    mid.save(file=output)
+    output.seek(0)
+    return output
 
+# --- ルーティング ---
 @app.route('/')
-def index(): return make_response(HTML_PAGE)
+def index():
+    response = make_response(HTML_PAGE)
+    response.headers['Content-Type'] = 'text/html; charset=utf-8'
+    return response
 
 @app.route('/process', methods=['POST'])
 def process():
