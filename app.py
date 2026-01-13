@@ -24,8 +24,8 @@ HTML_PAGE = """
         .subtitle { color: #94a3b8; margin-bottom: 30px; font-size: 1.1rem; }
         .form-group { margin: 20px 0; text-align: left; max-width: 400px; margin-left: auto; margin-right: auto; }
         label { display: block; font-size: 0.9rem; color: #94a3b8; margin-bottom: 8px; font-weight: 600; }
-        input[type="number"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; font-size: 1rem; box-sizing: border-box; transition: 0.3s; }
-        input[type="number"]:focus { border-color: var(--accent); outline: none; }
+        /* step="0.1" を追加して小数を許可 */
+        input[type="number"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         button { background: var(--accent); color: white; border: none; padding: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; width: 100%; font-size: 1.1rem; margin-top: 20px; transition: 0.2s; }
         button:hover { transform: translateY(-2px); opacity: 0.9; }
         .link-box { margin-top: 25px; padding-top: 20px; border-top: 1px solid #334155; font-size: 0.8rem; color: #94a3b8; }
@@ -49,11 +49,11 @@ HTML_PAGE = """
                 <input type="file" name="midi_file" accept=".mid,.midi" required style="color: #94a3b8;">
             </div>
             <div class="form-group">
-                <label>スレッショルド (1-127)<br><small>※この値以下の音を拡張（減衰）させます</small></label>
+                <label>スレッショルド (1-127)</label>
                 <input type="number" name="threshold" value="60" min="1" max="127">
             </div>
             <div class="form-group">
-                <label>レシオ (比率 1.0-10.0)</label>
+                <label>レシオ (比率 1.0 - 10.0)</label>
                 <input type="number" name="ratio" value="1.5" step="0.1" min="1.0" max="10.0">
             </div>
             <button type="submit">EXPAND & DOWNLOAD</button>
@@ -89,16 +89,15 @@ def process_logic(midi_file_stream, threshold, ratio):
             for msg in track:
                 if msg.type == 'note_on' and msg.velocity > 0:
                     if msg.velocity < threshold:
-                        # 拡張計算
-                        new_v = int(threshold - (threshold - msg.velocity) * ratio)
-                        msg.velocity = max(1, min(127, new_v))
+                        # 拡張計算: スレッショルド - (不足分 * レシオ)
+                        new_v = threshold - (threshold - msg.velocity) * ratio
+                        msg.velocity = max(1, min(127, int(new_v)))
         
         output = io.BytesIO()
         mid.save(file=output)
         output.seek(0)
         return output
     except Exception as e:
-        print(f"Error processing MIDI: {e}")
         return None
 
 @app.route('/')
@@ -109,30 +108,23 @@ def index():
 
 @app.route('/process', methods=['POST'])
 def process():
-    if 'midi_file' not in request.files:
-        return "No file uploaded", 400
-    
-    file = request.files['midi_file']
-    if file.filename == '':
-        return "No file selected", 400
+    file = request.files.get('midi_file')
+    if not file: return "No file", 400
 
+    # パラメータ取得を慎重に行う
     try:
         threshold = int(request.form.get('threshold', 60))
+        # floatに変換することで小数を扱えるようにする
         ratio = float(request.form.get('ratio', 1.5))
-    except ValueError:
+    except (ValueError, TypeError):
         return "Invalid parameters", 400
 
     processed_midi = process_logic(file, threshold, ratio)
     
     if processed_midi is None:
-        return "MIDIファイルの処理に失敗しました。ファイルが壊れているか、対応していない形式の可能性があります。", 500
+        return "Processing Error", 500
 
-    return send_file(
-        processed_midi, 
-        as_attachment=True, 
-        download_name="expanded.mid", 
-        mimetype='audio/midi'
-    )
+    return send_file(processed_midi, as_attachment=True, download_name="expanded.mid", mimetype='audio/midi')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
