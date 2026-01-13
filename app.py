@@ -91,7 +91,7 @@ HTML_PAGE = """
 
     <div class="policy-section">
         <h2>プライバシーポリシー</h2>
-        <p><strong>データ処理：</strong>アップロードされたMIDIファイルは保存されず、メモリ内で即座に処理・返送されます。プライバシーは完全に守られます。</p>
+        <p><strong>データ処理：</strong>アップロードされたMIDIファイルはサーバーに保存されず、メモリ内で即座に処理・返送されます。プライバシーは完全に守られます。</p>
         <p><strong>広告配信：</strong>当サイトではGoogle AdSense等の第三者配信事業者がCookieを利用して広告を配信する場合があります。</p>
     </div>
     <div class="footer-copy">&copy; 2026 MIDI Expander. All rights reserved.</div>
